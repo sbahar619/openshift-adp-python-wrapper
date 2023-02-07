@@ -84,6 +84,10 @@ class Backup(NamespacedResource):
     def deleting(self):
         return check_phase(self, self.BackupPhase.DELETING.value)
 
+    def done(self):
+        return self.failed_validation or self.uploading_partial_failure or \
+            self.completed or self.partially_failed or self.failed
+
     def wait_for_success(self, wait_timeout=240, sleep=5):
         return wait_for(
             condition_function=self.completed,

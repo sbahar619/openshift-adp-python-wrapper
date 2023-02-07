@@ -24,7 +24,11 @@ class VolumeSnapshotBackup(NamespacedResource):
 
         PARTIALLY_FAILED = "PartiallyFailed"
 
-    def replication_source_completed(self):
+    class VolumeSnapshotBackupCondition(Enum):
+        RECONCILED = "Reconciled"
+        SYNCHRONIZING = "Synchronizing"
+
+    def replication_source_done(self):
         try:
             conditions = self.status.conditions
         
@@ -33,9 +37,9 @@ class VolumeSnapshotBackup(NamespacedResource):
             return True
 
         return len(conditions) > 1 and \
-            conditions[0].type == "Reconciled" and \
+            conditions[0].type == self.VolumeSnapshotBackupCondition.RECONCILED.value and \
             conditions[0].type.status and \
-            conditions[1].type == "Synchronizing" and \
+            conditions[1].type == self.VolumeSnapshotBackupCondition.SYNCHRONIZING.value and \
             not conditions[1].status
 
     def done(self):
@@ -46,6 +50,14 @@ class VolumeSnapshotBackup(NamespacedResource):
         vsb_status = self.instance.status
         return vsb_status and vsb_status.phase != \
             self.VolumeSnapshotBackupPhase.IN_PROGRESS.value
+
+    def completed(self):
+        """
+        Check is VSB process is completed
+        @return: True if the VSB phase is Completed; False otherwise
+        """
+        vsb_status = self.instance.status
+        return vsb_status and vsb_status.phase == self.VolumeSnapshotBackupPhase.COMPLETED.value
 
     @classmethod
     def get_by_backup_name(cls, backup_name):
@@ -99,6 +111,14 @@ class VolumeSnapshotBackup(NamespacedResource):
     def wait_for_done(self, wait_timeout=240, sleep=5):
         return wait_for(
             condition_function=self.done,
+            description=f"{self.kind} to done, {self.name}",
+            sleep=sleep,
+            wait_timeout=wait_timeout
+        )
+
+    def wait_for_replication_source_done(self, wait_timeout=240, sleep=5):
+        return wait_for(
+            condition_function=self.replication_source_done,
             description=f"{self.kind} to done, {self.name}",
             sleep=sleep,
             wait_timeout=wait_timeout
